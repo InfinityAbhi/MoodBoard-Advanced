@@ -2,7 +2,7 @@ import { motion } from 'framer-motion'
 import { Sparkles } from 'lucide-react'
 import './Header.css'
 
-const Header = () => {
+const Header = ({ headline = 'MoodBoard', tagline = 'AI-powered insights in seconds.' }) => {
   return (
     <motion.header
       className="header"
@@ -17,7 +17,7 @@ const Header = () => {
           whileTap={{ scale: 0.95 }}
         >
           <Sparkles className="logo-icon" />
-          <span className="logo-text">MoodBoard</span>
+          <span className="logo-text">{headline}</span>
         </motion.div>
         <motion.div
           className="tagline"
@@ -25,7 +25,7 @@ const Header = () => {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3 }}
         >
-          AI-Powered Image Analysis
+          {tagline}
         </motion.div>
       </div>
     </motion.header>

@@ -5,14 +5,17 @@ Quick reference guide for deploying MoodBoard to AWS S3.
 ## 📋 Pre-Deployment
 
 - [ ] Google Cloud Vision API key is ready
-- [ ] `.env` file exists with `VITE_GOOGLE_CLOUD_VISION_API_KEY=your_key`
+- [ ] Supabase project URL + anon key configured in `.env`
+- [ ] Active event ID (`VITE_ACTIVE_EVENT_ID`) matches Supabase `events` table
+- [ ] Supabase storage bucket (e.g., `feedback-photos`) exists and is public or has signed URL workflow
+- [ ] `.env` file exists with all required variables
 - [ ] AWS account is created (free tier is fine)
 - [ ] Node.js 18+ is installed
 
 ## 🏗️ Build Steps
 
 - [ ] Run `npm install` (if not done already)
-- [ ] Verify `.env` file has your API key
+- [ ] Verify `.env` file has Vision + Supabase values
 - [ ] Run `npm run build`
 - [ ] Check that `dist/` folder was created with files
 
@@ -74,7 +77,8 @@ Quick reference guide for deploying MoodBoard to AWS S3.
 - [ ] Copy the "Bucket website endpoint" URL
 - [ ] Format: `http://your-bucket-name.s3-website-region.amazonaws.com`
 - [ ] Open URL in browser
-- [ ] Test image upload and analysis
+- [ ] Enter a test attendee email → capture feedback → ensure success screen appears
+- [ ] Verify Supabase `feedback` table has the new record + photo URL
 
 ## 🔒 Secure Your API Key
 
@@ -104,11 +108,12 @@ Quick reference guide for deploying MoodBoard to AWS S3.
 ## ✅ Final Verification
 
 - [ ] Website loads correctly
-- [ ] Can upload images
-- [ ] Image analysis works
-- [ ] Labels appear after analysis
-- [ ] Works on mobile device
-- [ ] API key is restricted to your domain
+- [ ] Email verification works
+- [ ] Camera permissions prompt and capture succeed
+- [ ] Vision score + satisfaction label displayed
+- [ ] Feedback stored in Supabase (`feedback` row + `has_participated=true`)
+- [ ] Works on mobile device with HTTPS
+- [ ] API key restricted to your domain(s)
 
 ## 🎉 Success!
 

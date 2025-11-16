@@ -4,231 +4,108 @@
 
 **Duration:** 2 hours  
 **Difficulty:** Beginner to Intermediate  
-**Prerequisites:** Basic HTML/CSS/JavaScript knowledge
+**Prerequisites:** Basic HTML/CSS/JavaScript, Google Cloud, and Supabase familiarity
 
 ## Workshop Agenda
 
-### 0-10 minutes: Introduction
+### 0–10 minutes · Introduction
 - Welcome to GDG Campus Chapter
-- Overview of cross-cloud innovation
-- Demo of final MoodBoard app
-- What we'll build today
+- Why instant event feedback matters
+- Live demo of the MoodBoard Feedback Station
+- Overview of tools: Google Vision, Supabase, AWS S3
 
-### 10-25 minutes: Setup
-1. **Create Google Cloud Project**
-   - Go to [Google Cloud Console](https://console.cloud.google.com/)
-   - Create new project or select existing
-   - Note your project ID
-
-2. **Enable Vision API**
-   - Navigate to "APIs & Services" → "Library"
-   - Search for "Cloud Vision API"
-   - Click "Enable"
-
-3. **Get API Key**
-   - Go to "APIs & Services" → "Credentials"
-   - Click "Create Credentials" → "API Key"
-   - Copy your API key
-   - **Important:** Restrict the key to Cloud Vision API only
-
-4. **Project Setup**
+### 10–30 minutes · Platform Setup
+1. **Google Cloud Vision**
+   - Create/select a project
+   - Enable Cloud Vision API
+   - Create an API key + restrict to Vision API
+2. **Supabase**
+   - Create/select a Supabase project
+   - Review `SUPABASE_SETUP.md` for SQL schema
+   - Create `feedback-photos` storage bucket (public)
+3. **Local Environment**
    ```bash
-   # Clone/download the project
+   git clone <repo>
    cd MOODBOARD
-   
-   # Install dependencies
    npm install
-   
-   # Create environment file
-   cp .env.example .env
-   
-   # Add your API key to .env
-   VITE_GOOGLE_CLOUD_VISION_API_KEY=your_api_key_here
+   cp env.example .env  # or create .env and copy variables from SETUP.md
+   ```
+   Populate `.env` with:
+   ```
+   VITE_GOOGLE_CLOUD_VISION_API_KEY=...
+   VITE_SUPABASE_URL=...
+   VITE_SUPABASE_ANON_KEY=...
+   VITE_ACTIVE_EVENT_ID=...
+   VITE_SUPABASE_STORAGE_BUCKET=feedback-photos
    ```
 
-### 25-60 minutes: Development
+### 30–55 minutes · Data Prep
+- Create an `events` row and note the UUID (active event)
+- Import attendee emails into `event_attendees` (`event_id`, `email`, `name`, `has_participated=false`)
+- Walkthrough of Supabase Table Editor & CSV import
 
-#### Understanding the Project Structure
-```
-src/
-├── components/
-│   ├── Header.jsx          # Navigation bar
-│   ├── Hero.jsx            # Landing page with upload area
-│   ├── ImageUploader.jsx   # Image upload and preview
-│   ├── ResultsDisplay.jsx  # Display detected labels
-│   └── Background3D.jsx   # 3D particle background
-├── App.jsx                 # Main application logic
-└── main.jsx                # Entry point
-```
+### 55–95 minutes · Code Deep Dive
+- **Architecture walkthrough**
+  - `App.jsx` step controller (email → camera → summary)
+  - Supabase client + helper utilities
+  - Satisfaction mapping logic in `utils/satisfaction.js`
+- **UI Components**
+  - `EmailStep` – form validation, error states
+  - `CameraCapture` – `getUserMedia`, canvas capture, UX best practices
+  - `FeedbackSummary` – confirmation / ready for next attendee
+- **Integrations**
+  - Vision API request payload + response parsing
+  - Supabase storage upload + public URL
+  - Enforcing one feedback per attendee (update `has_participated`)
+- Hands-on: run `npm run dev`, verify email, capture a test shot
 
-#### Key Concepts to Learn
+### 95–115 minutes · Deployment
+Pick a path (demo all if time allows):
+- **AWS S3 Static Hosting** (recommended) – follow `AWS_S3_DEPLOYMENT_CHECKLIST.md`
+- **AWS Amplify** – connect repo, add env vars, automatic builds
+- **Vercel / Netlify** – quick deploy with environment variables
 
-1. **React Hooks**
-   - `useState`: Managing component state
-   - `useRef`: Accessing DOM elements
-   - `useMemo`: Optimizing performance
-
-2. **Google Cloud Vision API**
-   - How to make API calls
-   - Processing API responses
-   - Handling errors
-
-3. **Modern UI/UX**
-   - CSS Grid and Flexbox
-   - Animations with Framer Motion
-   - Responsive design principles
-
-4. **3D Graphics**
-   - Three.js basics
-   - React Three Fiber
-   - Particle systems
-
-#### Hands-on Tasks
-
-1. **Test the App Locally**
-   ```bash
-   npm run dev
-   ```
-   Open http://localhost:5173
-
-2. **Upload an Image**
-   - Try uploading different types of images
-   - Observe the detected labels
-
-3. **Customize Colors** (Optional)
-   - Edit `src/index.css`
-   - Change CSS variables
-
-4. **Modify Labels Display** (Optional)
-   - Edit `src/components/ResultsDisplay.jsx`
-   - Change how labels are shown
-
-### 60-90 minutes: Deployment
-
-Choose one deployment method:
-
-#### Option A: AWS S3 (Recommended - Static Hosting)
-1. Build: `npm run build`
-2. Create S3 bucket (uncheck "Block public access")
-3. Enable static website hosting (index: `index.html`, error: `index.html`)
-4. Configure bucket policy for public read access
-5. Upload all files from `dist/` folder
-6. Get your website URL from Properties → Static website hosting
-7. Share your URL: `http://your-bucket-name.s3-website-region.amazonaws.com`
-
-📋 **Use the checklist:** See [AWS_S3_DEPLOYMENT_CHECKLIST.md](./AWS_S3_DEPLOYMENT_CHECKLIST.md) for detailed step-by-step instructions.
-
-#### Option B: AWS Amplify (Recommended)
-1. Push code to GitHub
-2. Connect to AWS Amplify
-3. Add environment variables
-4. Deploy automatically
-5. Share your URL
-
-#### Option C: Vercel/Netlify
-1. Push to GitHub
-2. Connect repository
-3. Add environment variables
-4. Deploy
-5. Share your URL
-
-**Detailed instructions:** See [DEPLOYMENT.md](./DEPLOYMENT.md)
-
-### 90-120 minutes: Showcase & Wrap-up
-
-1. **Student Showcases** (30 minutes)
-   - Students share their deployed apps
-   - Discuss challenges and solutions
-   - Show creative customizations
-
-2. **Q&A Session** (15 minutes)
-   - Technical questions
-   - Deployment issues
-   - Next steps
-
-3. **Wrap-up** (15 minutes)
-   - Key takeaways
-   - Resources for further learning
-   - Announce next GDG event
+### 115–120 minutes · Wrap-Up
+- Showcase: attendees share live links and Supabase dashboards
+- Q&A: troubleshooting, best practices, extensions
+- Next steps + upcoming GDG events
 
 ## Learning Outcomes
 
-By the end of this workshop, participants will:
+Participants will:
 
-✅ Understand how to integrate Google Cloud Vision API  
-✅ Know how to build modern React applications  
-✅ Learn to deploy static sites on AWS  
-✅ Experience working with AI/ML APIs  
-✅ Gain hands-on experience with modern web technologies  
-✅ Have a portfolio-worthy project to share
+✅ Configure Google Vision + Supabase for real-time feedback  
+✅ Build a React workflow that talks to third-party APIs securely  
+✅ Capture camera input and process it in-browser  
+✅ Persist data + media using Supabase tables and storage  
+✅ Deploy a production-ready static web app (S3 / Amplify / Vercel)  
+✅ Leave with a polished, creative project for their portfolio
 
-## Troubleshooting Common Issues
+## Troubleshooting Highlights
 
-### API Key Not Working
-- **Issue:** "API key not found" error
-- **Solution:** Check `.env` file exists and has correct variable name
-
-### Build Errors
-- **Issue:** `npm install` fails
-- **Solution:** 
-  - Check Node.js version (18+)
-  - Delete `node_modules` and `package-lock.json`
-  - Run `npm install` again
-
-### API Rate Limits
-- **Issue:** API requests fail
-- **Solution:** 
-  - Check Google Cloud billing is enabled
-  - Verify API quotas
-  - Wait a minute and retry
-
-### Deployment Issues
-- **Issue:** App not loading after deployment
-- **Solution:** 
-  - Check environment variables are set
-  - Verify build completed successfully
-  - Check browser console for errors
+- **Camera blocked:** ensure HTTPS + granted permissions; refresh page.
+- **Email rejected:** confirm attendee exists for `VITE_ACTIVE_EVENT_ID` and `has_participated` is `false`.
+- **Supabase 401:** invalid URL/anon key or missing RLS policy. Re-check `.env` and policies in `SUPABASE_SETUP.md`.
+- **Vision API errors:** verify API key, billing, and face presence in frame.
+- **Build issues:** Node 18+, clear `node_modules`, reinstall.
 
 ## Extension Ideas
 
-Want to take this further? Try these:
-
-1. **Add Image Filters**
-   - Apply CSS filters before analysis
-   - Compare filtered vs original
-
-2. **Batch Processing**
-   - Upload multiple images
-   - Analyze all at once
-
-3. **Save Results**
-   - Store results in localStorage
-   - Create a gallery of analyzed images
-
-4. **Export Results**
-   - Download labels as JSON
-   - Generate a report PDF
-
-5. **Advanced AI Features**
-   - Sentiment analysis
-   - Color palette extraction
-   - Similar image search
+1. **Multiple Events UI** – allow organisers to pick active event from dropdown
+2. **Signed Storage URLs** – keep images private but accessible via time-limited links
+3. **Edge Functions** – move scoring logic to Supabase backend for auditing
+4. **Analytics Dashboard** – chart satisfaction over time per event
+5. **Multi-Face Handling** – capture group sentiments, aggregate scores
 
 ## Resources
 
-- [React Documentation](https://react.dev/)
-- [Google Cloud Vision API](https://cloud.google.com/vision/docs)
-- [Three.js Documentation](https://threejs.org/docs/)
+- [SETUP.md](./SETUP.md) – environment configuration
+- [SUPABASE_SETUP.md](./SUPABASE_SETUP.md) – schema + policies
+- [DEPLOYMENT.md](./DEPLOYMENT.md) – hosting guides
+- [Google Cloud Vision Docs](https://cloud.google.com/vision/docs)
+- [Supabase Docs](https://supabase.com/docs)
 - [Framer Motion](https://www.framer.com/motion/)
-- [AWS Amplify Docs](https://docs.amplify.aws/)
-- [Vite Documentation](https://vitejs.dev/)
-
-## Support
-
-For workshop-related questions:
-- Ask your workshop leader
-- Check the [README.md](./README.md)
-- Visit GDG Campus Chapter resources
+- [React Three Fiber](https://docs.pmnd.rs/react-three-fiber/getting-started/introduction)
 
 ---
 

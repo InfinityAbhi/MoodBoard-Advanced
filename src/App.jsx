@@ -1,188 +1,255 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Header from './components/Header'
-import Hero from './components/Hero'
-import ImageUploader from './components/ImageUploader'
-import ResultsDisplay from './components/ResultsDisplay'
 import Background3D from './components/Background3D'
+import EmailStep from './components/EmailStep'
+import CameraCapture from './components/CameraCapture'
+import FeedbackSummary from './components/FeedbackSummary'
+import { supabase } from './lib/supabaseClient'
+import { deriveSatisfactionScore } from './utils/satisfaction'
 import './App.css'
 
+const FEEDBACK_BUCKET = import.meta.env.VITE_SUPABASE_STORAGE_BUCKET || 'feedback-photos'
+const ACTIVE_EVENT_ID = import.meta.env.VITE_ACTIVE_EVENT_ID
+
+const ensureSupabaseClient = () => {
+  if (!supabase) {
+    throw new Error('Supabase client not initialised. Please check your environment configuration.')
+  }
+}
+
+const dataUrlToFile = (dataUrl, fileName) => {
+  const [header, base64] = dataUrl.split(',')
+  const mimeMatch = header.match(/:(.*?);/)
+  const mime = mimeMatch?.[1] || 'image/png'
+  const binary = atob(base64)
+  const array = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i += 1) {
+    array[i] = binary.charCodeAt(i)
+  }
+  return new File([array], fileName, { type: mime })
+}
+
 function App() {
-  const [imageFile, setImageFile] = useState(null)
-  const [imagePreview, setImagePreview] = useState(null)
-  const [labels, setLabels] = useState([])
+  const [step, setStep] = useState('email')
+  const [attendee, setAttendee] = useState(null)
+  const [feedback, setFeedback] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  const handleImageUpload = (file) => {
-    setImageFile(file)
-    setLabels([])
+  const resetFlow = useCallback(() => {
+    setStep('email')
+    setAttendee(null)
+    setFeedback(null)
     setError(null)
-    
-    const reader = new FileReader()
-    reader.onloadend = () => {
-      setImagePreview(reader.result)
+    setLoading(false)
+  }, [])
+
+  const verifyAttendee = useCallback(async (email) => {
+    ensureSupabaseClient()
+
+    if (!ACTIVE_EVENT_ID) {
+      throw new Error('Active event is not configured. Set VITE_ACTIVE_EVENT_ID in your environment variables.')
     }
-    reader.readAsDataURL(file)
-  }
 
-  const handleImageAnalysis = async (base64Image) => {
-    setLoading(true)
-    setError(null)
+    const normalizedEmail = email.trim().toLowerCase()
 
+    const { data, error: selectError } = await supabase
+      .from('event_attendees')
+      .select('id, email, has_participated, name')
+      .eq('event_id', ACTIVE_EVENT_ID)
+      .eq('email', normalizedEmail)
+      .maybeSingle()
+
+    if (selectError) {
+      throw new Error(selectError.message)
+    }
+
+    if (!data) {
+      throw new Error('Email not found for this event. Please check the spelling or contact the organiser.')
+    }
+
+    if (data.has_participated) {
+      throw new Error('Feedback already captured for this email. Thank you!')
+    }
+
+    return data
+  }, [])
+
+  const handleEmailSubmit = useCallback(async (email) => {
     try {
-      const apiKey = import.meta.env.VITE_GOOGLE_CLOUD_VISION_API_KEY
-      
-      if (!apiKey) {
-        throw new Error('Google Cloud Vision API key not found. Please set VITE_GOOGLE_CLOUD_VISION_API_KEY in your .env file')
-      }
+      setLoading(true)
+      setError(null)
 
-      const response = await fetch(
-        `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            requests: [
-              {
-                image: {
-                  content: base64Image.split(',')[1],
-                },
-                features: [
-                  { type: 'LABEL_DETECTION', maxResults: 20 },
-                  { type: 'FACE_DETECTION', maxResults: 10 },
-                  { type: 'OBJECT_LOCALIZATION', maxResults: 20 },
-                ],
-              },
-            ],
-          }),
-        }
-      )
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error?.message || 'Failed to analyze image')
-      }
-
-      const data = await response.json()
-      
-      // Process labels from different detection types
-      const processedLabels = []
-      
-      // Label detection results
-      if (data.responses[0]?.labelAnnotations) {
-        data.responses[0].labelAnnotations.forEach(label => {
-          processedLabels.push({
-            name: label.description,
-            confidence: label.score,
-            type: 'label'
-          })
-        })
-      }
-      
-      // Face detection results (emotions)
-      if (data.responses[0]?.faceAnnotations) {
-        data.responses[0].faceAnnotations.forEach((face, index) => {
-          const emotions = []
-          if (face.joyLikelihood && face.joyLikelihood !== 'VERY_UNLIKELY') {
-            emotions.push('Joy')
-          }
-          if (face.sorrowLikelihood && face.sorrowLikelihood !== 'VERY_UNLIKELY') {
-            emotions.push('Sorrow')
-          }
-          if (face.angerLikelihood && face.angerLikelihood !== 'VERY_UNLIKELY') {
-            emotions.push('Anger')
-          }
-          if (face.surpriseLikelihood && face.surpriseLikelihood !== 'VERY_UNLIKELY') {
-            emotions.push('Surprise')
-          }
-          
-          emotions.forEach(emotion => {
-            processedLabels.push({
-              name: emotion,
-              confidence: 0.8,
-              type: 'emotion'
-            })
-          })
-        })
-      }
-      
-      // Object detection results
-      if (data.responses[0]?.localizedObjectAnnotations) {
-        data.responses[0].localizedObjectAnnotations.forEach(obj => {
-          processedLabels.push({
-            name: obj.name,
-            confidence: obj.score,
-            type: 'object'
-          })
-        })
-      }
-
-      // Remove duplicates and sort by confidence
-      const uniqueLabels = processedLabels.reduce((acc, label) => {
-        const existing = acc.find(l => l.name.toLowerCase() === label.name.toLowerCase())
-        if (!existing) {
-          acc.push(label)
-        } else if (label.confidence > existing.confidence) {
-          Object.assign(existing, label)
-        }
-        return acc
-      }, [])
-
-      uniqueLabels.sort((a, b) => b.confidence - a.confidence)
-      setLabels(uniqueLabels.slice(0, 15))
+      const attendeeRecord = await verifyAttendee(email)
+      setAttendee(attendeeRecord)
+      setStep('camera')
     } catch (err) {
-      console.error('Error analyzing image:', err)
-      setError(err.message || 'Failed to analyze image. Please try again.')
+      console.error('Email verification failed:', err)
+      setError(err.message || 'Unable to verify email. Please try again.')
     } finally {
       setLoading(false)
     }
-  }
+  }, [verifyAttendee])
 
-  const handleAnalyze = async () => {
-    if (!imageFile) return
+  const analyseImage = useCallback(async (imageDataUrl) => {
+    const apiKey = import.meta.env.VITE_GOOGLE_CLOUD_VISION_API_KEY
 
-    const base64Image = imagePreview
-    await handleImageAnalysis(base64Image)
-  }
+    if (!apiKey) {
+      throw new Error('Google Cloud Vision API key missing. Set VITE_GOOGLE_CLOUD_VISION_API_KEY in your environment variables.')
+    }
 
-  const handleReset = () => {
-    setImageFile(null)
-    setImagePreview(null)
-    setLabels([])
-    setError(null)
-  }
+    const response = await fetch(
+      `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requests: [
+            {
+              image: { content: imageDataUrl.split(',')[1] },
+              features: [{ type: 'FACE_DETECTION', maxResults: 1 }],
+            },
+          ],
+        }),
+      }
+    )
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.error?.message || 'Failed to analyse expression. Please retry.')
+    }
+
+    const data = await response.json()
+    const faceAnnotation = data.responses?.[0]?.faceAnnotations?.[0]
+
+    if (!faceAnnotation) {
+      throw new Error('No face detected in the frame. Please try again.')
+    }
+
+    return deriveSatisfactionScore(faceAnnotation)
+  }, [])
+
+  const persistFeedback = useCallback(async ({
+    attendeeRecord,
+    analysis,
+    imageDataUrl,
+  }) => {
+    ensureSupabaseClient()
+
+    const timestamp = Date.now()
+    const safeEmail = attendeeRecord.email.replace(/[^a-z0-9]/gi, '_')
+    const fileName = `${ACTIVE_EVENT_ID}-${safeEmail}-${timestamp}.png`
+    const file = dataUrlToFile(imageDataUrl, fileName)
+
+    const { error: uploadError } = await supabase
+      .storage
+      .from(FEEDBACK_BUCKET)
+      .upload(fileName, file, { contentType: file.type })
+
+    if (uploadError) {
+      throw new Error(uploadError.message)
+    }
+
+    const { data: publicUrlData } = supabase
+      .storage
+      .from(FEEDBACK_BUCKET)
+      .getPublicUrl(fileName)
+
+    const photoUrl = publicUrlData?.publicUrl || null
+
+    const { error: insertError } = await supabase
+      .from('feedback')
+      .insert({
+        event_id: ACTIVE_EVENT_ID,
+        attendee_id: attendeeRecord.id,
+        email: attendeeRecord.email,
+        score: analysis.score,
+        satisfaction_label: analysis.label,
+        sentiment_context: analysis.context,
+        photo_path: fileName,
+        photo_url: photoUrl,
+      })
+
+    if (insertError) {
+      throw new Error(insertError.message)
+    }
+
+    const { error: updateError } = await supabase
+      .from('event_attendees')
+      .update({ has_participated: true, last_feedback_at: new Date().toISOString() })
+      .eq('id', attendeeRecord.id)
+
+    if (updateError) {
+      throw new Error(updateError.message)
+    }
+
+    return { ...analysis, photoUrl }
+  }, [])
+
+  const handleCapture = useCallback(async (imageDataUrl) => {
+    try {
+      if (!attendee) {
+        throw new Error('Attendee context missing. Please restart the flow.')
+      }
+
+      setLoading(true)
+      setError(null)
+
+      const analysis = await analyseImage(imageDataUrl)
+      const result = await persistFeedback({
+        attendeeRecord: attendee,
+        analysis,
+        imageDataUrl,
+      })
+
+      setFeedback({
+        email: attendee.email,
+        score: result.score,
+        label: result.label,
+        context: result.context,
+        photoUrl: result.photoUrl,
+      })
+
+      setStep('summary')
+    } catch (err) {
+      console.error('Feedback capture failed:', err)
+      setError(err.message || 'Unable to capture feedback. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }, [analyseImage, attendee, persistFeedback])
 
   return (
     <div className="app">
       <Background3D />
-      <Header />
+      <Header headline="Event Feedback Station" tagline="Verify, capture, analyse – all in seconds." />
       <main className="main-content">
+        {error && step !== 'email' && (
+          <motion.div
+            className="global-error"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            {error}
+          </motion.div>
+        )}
         <AnimatePresence mode="wait">
-          {!imagePreview ? (
-            <Hero key="hero" onImageUpload={handleImageUpload} />
-          ) : (
-            <motion.div
-              key="analysis"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="analysis-container"
-            >
-              <ImageUploader
-                imagePreview={imagePreview}
-                onImageChange={handleImageUpload}
-                onAnalyze={handleAnalyze}
-                onReset={handleReset}
-                loading={loading}
-                error={error}
-              />
-              {labels.length > 0 && (
-                <ResultsDisplay labels={labels} />
-              )}
-            </motion.div>
+          {step === 'email' && (
+            <EmailStep key="email" onSubmit={handleEmailSubmit} loading={loading} error={error} />
+          )}
+          {step === 'camera' && attendee && (
+            <CameraCapture
+              key="camera"
+              attendee={attendee}
+              onCapture={handleCapture}
+              loading={loading}
+              error={error}
+              onBack={resetFlow}
+            />
+          )}
+          {step === 'summary' && feedback && (
+            <FeedbackSummary key="summary" feedback={feedback} onReset={resetFlow} />
           )}
         </AnimatePresence>
       </main>

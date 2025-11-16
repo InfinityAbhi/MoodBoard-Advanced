@@ -6,23 +6,29 @@ This guide covers multiple deployment options for the MoodBoard application.
 
 1. ✅ Build the project successfully: `npm run build`
 2. ✅ Test locally with `npm run preview`
-3. ✅ Set up Google Cloud Vision API key
-4. ✅ Ensure all environment variables are configured
+3. ✅ Google Cloud Vision API key added to `.env`
+4. ✅ Supabase URL + anon key configured (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`)
+5. ✅ Active event ID set (`VITE_ACTIVE_EVENT_ID`) and roster imported
+6. ✅ Supabase storage bucket (default `feedback-photos`) created and public/readable
 
 ## Option 1: AWS S3 + CloudFront (Recommended for Production)
 
 > **Workshop Note:** This is the recommended deployment method for the workshop. AWS S3 provides simple, cost-effective static website hosting.
 
-### Step 1: Build the Application with Environment Variable
+### Step 1: Build the Application with Environment Variables
 ```bash
-# Make sure your .env file has your API key
-# VITE_GOOGLE_CLOUD_VISION_API_KEY=your_api_key_here
+# Ensure .env contains all required keys
+# VITE_GOOGLE_CLOUD_VISION_API_KEY=...
+# VITE_SUPABASE_URL=...
+# VITE_SUPABASE_ANON_KEY=...
+# VITE_ACTIVE_EVENT_ID=...
+# VITE_SUPABASE_STORAGE_BUCKET=feedback-photos
 
-# Build the application (the API key will be embedded in the build)
+# Build the application (environment values are embedded at build time)
 npm run build
 ```
 
-> **Important:** Since S3 is static hosting, the API key from your `.env` file will be embedded in the JavaScript bundle during build. This is normal for client-side apps, but make sure to restrict your Google Cloud API key to only your domain.
+> **Important:** Static hosting means the Vision key and Supabase URLs are bundled with the frontend. Protect them by restricting the API key (Google Cloud) and configuring Supabase RLS policies/permissions properly.
 
 ### Step 2: Create S3 Bucket
 1. Go to [AWS S3 Console](https://s3.console.aws.amazon.com/)
